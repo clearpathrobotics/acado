@@ -120,8 +120,25 @@ class SCPmeritFunction : public AlgorithmicBase
     	//double equalityWeight;
     	//double boundWeight;
     	//double constraintWeight;
-
-
+	  
+		// pre-allocated memory chunks to reduce malloc/free churn
+		BlockMatrix cp_lambdaDynamic_getAbsolute;
+		BlockMatrix cp_dynResiduum_getAbsolute;
+		
+		BlockMatrix cp_lambdaBound_getAbsolute;
+		BlockMatrix cp_upperBoundResiduum_getNegative;
+		BlockMatrix cp_lowerBoundResiduum_getPositive;
+		
+		BlockMatrix cp_lambdaConstraint_getAbsolute;
+		BlockMatrix cp_upperConstraintResiduum_getNegative;
+		
+		BlockMatrix cp_lowerConstraintResiduum_getPositive;
+		
+		BlockMatrix temporary0;
+		BlockMatrix temporary1;
+		BlockMatrix temporary2;
+		BlockMatrix temporary3;
+		BlockMatrix temporary4;
 };
 
 

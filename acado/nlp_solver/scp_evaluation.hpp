@@ -183,6 +183,26 @@ class SCPevaluation : public AlgorithmicBase
 
 		BooleanType isCP;
 		BooleanType areSensitivitiesFrozen;
+		
+		// pre-allocated memory chunks to reduce malloc/free churn
+		BlockMatrix temporary0;
+		BlockMatrix oG_dX;
+		BlockMatrix absLD;
+		BlockMatrix absDR;
+		BlockMatrix absLDT_absDR;
+		BlockMatrix absLB;
+		BlockMatrix ubrNeg;
+		BlockMatrix absLBT_ubrNeg;
+		BlockMatrix lbrPos;
+		BlockMatrix absLBT_lbrPos;
+		
+		BlockMatrix absLC;
+		BlockMatrix ucrNeg;
+		BlockMatrix absLCT_ucrNeg;
+		
+		BlockMatrix lcrPos;
+		BlockMatrix absLCT_lcrPos;
+
 };
 
 

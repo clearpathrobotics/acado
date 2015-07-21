@@ -154,14 +154,17 @@ returnValue BFGSupdate::applyUpdate(	BlockMatrix &B,
     BlockMatrix z   ;             // the modified "gradient" y (needed for Powell's strategy)
     double      xz = 0.0;         // the scalar  x^T z
     BlockMatrix zz  ;             // the matrix  z*z^T
+    BlockMatrix tmp ;
 
 
     // COMPUTATION OF Bx, xBx, xy AND BxxB:
     // -------------------------------------
-    Bx = B*x;
-    (x^Bx).getSubBlock( 0, 0, xBx, 1, 1 );
-    (y^x ).getSubBlock( 0, 0, xy , 1, 1 );
-    BxxB = Bx*Bx.transpose();
+    //Bx = B*x;
+    BlockMatrix::mat_mat_mul(B, x, Bx);
+	BlockMatrix::matT_mat_mul(x, Bx, tmp); tmp.getSubBlock( 0, 0, xBx, 1, 1 );
+	BlockMatrix::matT_mat_mul(y,  x, tmp); tmp.getSubBlock( 0, 0, xy , 1, 1 );
+	Bx.transpose(tmp);
+	BlockMatrix::mat_mat_mul(Bx, tmp, BxxB);
 
 
     // CURVATURE CHECK:
@@ -201,8 +204,9 @@ returnValue BFGSupdate::applyUpdate(	BlockMatrix &B,
         }
     }
 
-    zz = z*z.transpose();
-
+	z.transpose(tmp);
+	BlockMatrix::mat_mat_mul(z, tmp, zz);
+	
     BxxB *= 1.0/(xBx(0,0) + regularisation);
     zz   *= 1.0/(xz       + regularisation);
 
@@ -210,7 +214,8 @@ returnValue BFGSupdate::applyUpdate(	BlockMatrix &B,
     // PERFORM THE UPDATE:
     // -------------------
 
-    B += zz - BxxB;
+    B += zz;
+    B -= BxxB;
 
     return SUCCESSFUL_RETURN;
 }

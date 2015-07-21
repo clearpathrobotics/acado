@@ -71,7 +71,7 @@ class BlockMatrix
         virtual ~BlockMatrix( );
 
         /** Initializer */
-		returnValue init( uint _nRows, uint _nCols );
+		returnValue init( uint _nRows, uint _nCols, bool zero_elements=true );
 
 		/** Set method that defines the value of a certain component.
 		 *  \return SUCCESSFUL_RETURN */
@@ -109,6 +109,10 @@ class BlockMatrix
 		/** Adds (element-wise) a matrix to object.
 		 *  \return Reference to object after addition. */
 		BlockMatrix& operator+=( const BlockMatrix& arg /**< Second summand. */ );
+
+		/** Subtracts (element-wise) a matrix to object.
+		 *  \return Reference to object after subtraction. */
+		BlockMatrix& operator-=( const BlockMatrix& arg /**< Subtrahend. */ );
 
 		/** Subtracts (element-wise) a matrix from the object and and stores
 		 *  the result to a temporary object.
@@ -203,11 +207,54 @@ class BlockMatrix
 		returnValue print(	std::ostream& stream = std::cout
 							) const;
 
-    //
+		// The following are versions of some of the methods above where the result
+		// matrix is provided explicitely to avoid excessive memory allocation
+							
+		/** Element by element addition of two matrices m1 and m2 storing the sum 
+		 *  in result
+		 */
+		static void mat_mat_add(const BlockMatrix& m1, const BlockMatrix& m2, BlockMatrix& result);
+
+		/** Element by element subtraction of two matrices m1 and m2 storing the difference 
+		 *  in result
+		 */
+		static void mat_mat_sub(const BlockMatrix& m1, const BlockMatrix& m2, BlockMatrix& result);
+
+		/** Multiply two matrices m1 and m2 storing the result in result */
+		static void mat_mat_mul(const BlockMatrix& m1, const BlockMatrix& m2, BlockMatrix& result);
+
+		/** Multiplies a matrix from the right to the transposed matrix object and
+		 *  stores the result to a given matrix.
+		 */
+		static void matT_mat_mul(const BlockMatrix& m1, const BlockMatrix& m2, BlockMatrix& result);
+		
+		/** Write the transpose of the object into the provided matrix*/
+		void transpose(BlockMatrix& result) const;
+
+		/** Write the block matrix whose components are the absolute
+         *  values of the components of this object into the provided matrix.
+         */
+		void getAbsolute(BlockMatrix& result) const;
+
+        /** Write the block matrix whose components are equal to
+         *  the components of this object, if they are positive or zero,
+         *  but zero otherwise into the provided matrix.
+         */
+		void getPositive(BlockMatrix& result) const;
+		
+        /** Write the block matrix whose components are equal to
+         *  the components of this object, if they are negative or zero,
+         *  but zero otherwise into the provided matrix.
+         */
+		void getNegative(BlockMatrix& result) const;
+
+
+	//
     // DATA MEMBERS:
     //
     protected:
-
+		void setZeroKeepType();
+		
 		uint nRows;			/**< Number of rows. */
 		uint nCols;			/**< Number of columns. */
 
