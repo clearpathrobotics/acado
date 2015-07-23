@@ -378,14 +378,25 @@ returnValue SCPevaluation::evaluateLagrangeGradient(	uint N,
                 lambdaBoundExpand.setDense(4*N+run1,0,tmp1);
         }
 
-        nablaL  = cp.objectiveGradient.transpose() - lambdaBoundExpand - (cp.constraintGradient^cp.lambdaConstraint) + aux;
-    }
+		cp.objectiveGradient.transpose(nablaL);
+		nablaL -= lambdaBoundExpand;
+		
+		BlockMatrix::matT_mat_mul(cp.constraintGradient, cp.lambdaConstraint, temporary0);
+		nablaL -= temporary0;
+		
+		nablaL += aux;
+	}
     else{
         BlockMatrix lambdaBoundExpand(5,1);
         cp.lambdaBound.getSubBlock(1,0,tmp1);
         if( tmp1.getDim() != 0 )
              lambdaBoundExpand.setDense(2,0,tmp1);
-        nablaL  = cp.objectiveGradient.transpose() - lambdaBoundExpand - (cp.constraintGradient^cp.lambdaConstraint);
+		
+		cp.objectiveGradient.transpose(nablaL);
+		nablaL -= lambdaBoundExpand;
+		
+		BlockMatrix::matT_mat_mul(cp.constraintGradient, cp.lambdaConstraint, temporary0);
+		nablaL -= temporary0;
     }
 
     return SUCCESSFUL_RETURN;
@@ -421,7 +432,8 @@ double SCPevaluation::getKKTtolerance(	const OCPiterate& iter,
 	{
 		eps = KKTmultiplierRegularisation;
 
-		(cp.objectiveGradient*cp.deltaX).getSubBlock( 0, 0, tmp, 1, 1 );
+		BlockMatrix::mat_mat_mul(cp.objectiveGradient, cp.deltaX, oG_dX);
+		oG_dX.getSubBlock( 0, 0, tmp, 1, 1 );
 // 		(cp.objectiveGradient*cp.deltaX).print();
 		KKTtol = fabs(tmp(0,0));
 	}
@@ -438,7 +450,12 @@ double SCPevaluation::getKKTtolerance(	const OCPiterate& iter,
 
     if( dynamicDiscretization != 0 )
     {
-        ( (cp.lambdaDynamic.getAbsolute()).addRegularisation(eps)^cp.dynResiduum.getAbsolute()).getSubBlock( 0, 0, tmp, 1, 1 );
+		cp.lambdaDynamic.getAbsolute(absLD);
+		absLD.addRegularisation(eps);
+		cp.dynResiduum.getAbsolute(absDR);
+		BlockMatrix::matT_mat_mul(absLD, absDR, absLDT_absDR);
+		
+		absLDT_absDR.getSubBlock( 0, 0, tmp, 1, 1 );
         KKTtol += tmp(0,0);
     }
 
@@ -455,10 +472,16 @@ double SCPevaluation::getKKTtolerance(	const OCPiterate& iter,
 // 
 //        printf("interm. = %.16e \n", KKTtol );
 
-    ((cp.lambdaBound.getAbsolute()).addRegularisation(eps)^cp.upperBoundResiduum.getNegative()).getSubBlock( 0, 0, tmp, 1, 1 );
+	cp.lambdaBound.getAbsolute(absLB);
+	absLB.addRegularisation(eps);
+	cp.upperBoundResiduum.getNegative(ubrNeg);
+	BlockMatrix::matT_mat_mul(absLB, ubrNeg, absLBT_ubrNeg);
+    absLBT_ubrNeg.getSubBlock( 0, 0, tmp, 1, 1 );
     KKTtol -= tmp(0,0);
-
-    ((cp.lambdaBound.getAbsolute()).addRegularisation(eps)^cp.lowerBoundResiduum.getPositive()).getSubBlock( 0, 0, tmp, 1, 1 );
+	
+	cp.lowerBoundResiduum.getPositive(lbrPos);
+	BlockMatrix::matT_mat_mul(absLB, lbrPos, absLBT_lbrPos);
+	absLBT_lbrPos.getSubBlock( 0, 0, tmp, 1, 1 );
     KKTtol += tmp(0,0);
 
 //
@@ -476,10 +499,19 @@ double SCPevaluation::getKKTtolerance(	const OCPiterate& iter,
 
     if( ( constraint != 0 ) || ( dynamicDiscretization != 0 ) )
     {
-        ((cp.lambdaConstraint.getAbsolute()).addRegularisation(eps)^cp.upperConstraintResiduum.getNegative()).getSubBlock( 0, 0, tmp, 1, 1 );
+        cp.lambdaConstraint.getAbsolute(absLC);
+		absLC.addRegularisation(eps);
+		
+		cp.upperConstraintResiduum.getNegative(ucrNeg);
+		BlockMatrix::matT_mat_mul(absLC, ucrNeg, absLCT_ucrNeg);
+		
+        absLCT_ucrNeg.getSubBlock( 0, 0, tmp, 1, 1 );
         KKTtol -= tmp(0,0);
 
-        ((cp.lambdaConstraint.getAbsolute()).addRegularisation(eps)^cp.lowerConstraintResiduum.getPositive()).getSubBlock( 0, 0, tmp, 1, 1 );
+		cp.lowerConstraintResiduum.getPositive(lcrPos);
+		BlockMatrix::matT_mat_mul(absLC, lcrPos, absLCT_lcrPos);
+        absLCT_lcrPos.getSubBlock( 0, 0, tmp, 1, 1 );
+		
         KKTtol += tmp(0,0);
     }
 

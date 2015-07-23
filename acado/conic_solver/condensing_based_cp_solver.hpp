@@ -267,7 +267,12 @@ class CondensingBasedCPsolver: public BandedCPsolver {
         BlockMatrix       ubDense;    /**< Simple upper bounds                 */
         // ----------------------------------------------------------------------
 
-
+        // Temporary memory for some math operations
+		BlockMatrix       temporary1;
+		BlockMatrix       temporary2;
+		BlockMatrix       temporary3;
+		
+		
         DenseCPsolver* cpSolver;
         DenseQPsolver* cpSolverRelaxed;
 

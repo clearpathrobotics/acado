@@ -47,6 +47,7 @@ BlockMatrix::BlockMatrix( )
 
 BlockMatrix::BlockMatrix( uint _nRows, uint _nCols )
 {
+	nRows = nCols = 0;
 	init(_nRows, _nCols);
 }
 
@@ -54,6 +55,7 @@ BlockMatrix::BlockMatrix( uint _nRows, uint _nCols )
 BlockMatrix::BlockMatrix(	const DMatrix& value
 							)
 {
+	nRows = nCols = 0;
 	init(1, 1);
 
 	setDense(0, 0, value);
@@ -62,20 +64,62 @@ BlockMatrix::BlockMatrix(	const DMatrix& value
 BlockMatrix::~BlockMatrix( )
 {}
 
-returnValue BlockMatrix::init( uint _nRows, uint _nCols )
+returnValue BlockMatrix::init( uint _nRows, uint _nCols, bool zero_elements )
 {
+	if(_nRows == nRows && _nCols == nCols)
+	{
+		if(zero_elements)
+			setZeroKeepType();
+		return SUCCESSFUL_RETURN;
+	}
+	
 	nRows = _nRows;
 	nCols = _nCols;
+	
+	if(nRows * nCols == 0)
+		return SUCCESSFUL_RETURN;
 
-	vector< DMatrix > foo(nCols, DMatrix());
+	const size_t pre = elements.size();
+	if(pre < nRows)
+	{
+		elements.resize(nRows);
+		types.resize(nRows);
+	}
+	
 	for (unsigned row = 0; row < nRows; ++row)
-		elements.push_back( foo );
+	{
+		if (elements[row].size() < nCols)
+		{
+			elements[row].resize(nCols, DMatrix());
+			types[row].resize(nCols, SBMT_ZERO);
+		}
+	}
 
-	vector< SubBlockMatrixType > bar(nCols, SBMT_ZERO);
-	for (unsigned row = 0; row < nRows; ++row)
-		types.push_back( bar );
+	if(zero_elements)
+		setZeroKeepType();
 
 	return SUCCESSFUL_RETURN;
+}
+
+void BlockMatrix::setZeroKeepType()
+{
+  for(uint r=0; r<nRows; r++)
+  {
+	for(uint c=0; c<nCols; c++)
+	{
+	  switch(types[r][c])
+	  {
+		case SBMT_UNKNOWN:
+		case SBMT_ZERO:
+		break;
+		
+		case SBMT_ONE:
+		case SBMT_DENSE:
+		  elements[r][c].setZero();
+		break;
+	  }
+	}
+  }
 }
 
 
@@ -108,6 +152,40 @@ BlockMatrix BlockMatrix::operator+( const BlockMatrix& arg ) const{
 	return tmp;
 }
 
+void BlockMatrix::mat_mat_add(const BlockMatrix& m1, const BlockMatrix& arg, BlockMatrix& result)
+{
+	ASSERT( ( m1.getNumRows( ) == arg.getNumRows( ) ) && ( m1.getNumCols( ) == arg.getNumCols( ) ) );
+
+	uint i,j;
+
+	result.init( m1.getNumRows( ), m1.getNumCols( ) );
+	
+	for( i=0; i < m1.getNumRows(); i++ ){
+        for( j=0; j < m1.getNumCols(); j++ ){
+
+            if( m1.types[i][j] == SBMT_ZERO )
+			{
+                result.types    [i][j] = arg.types    [i][j];
+                result.elements [i][j] = arg.elements [i][j];
+            }
+            else
+			{
+                if( arg.types[i][j] == SBMT_ZERO )
+				{
+				  result.types    [i][j] = m1.types    [i][j];
+				  result.elements [i][j] = m1.elements [i][j];
+				}
+				else
+				{
+                   result.types    [i][j] = SBMT_DENSE     ;
+                   result.elements [i][j] = m1.elements [i][j] + arg.elements[i][j];
+                }
+            }
+        }
+    }
+}
+
+
 
 BlockMatrix& BlockMatrix::operator+=( const BlockMatrix& arg ){
 
@@ -135,6 +213,67 @@ BlockMatrix& BlockMatrix::operator+=( const BlockMatrix& arg ){
 	return *this;
 }
 
+BlockMatrix& BlockMatrix::operator-=( const BlockMatrix& arg ){
+
+	ASSERT( ( getNumRows( ) == arg.getNumRows( ) ) && ( getNumCols( ) == arg.getNumCols( ) ) );
+
+	uint i, j;
+
+	for( i = 0; i < getNumRows(); i++ ){
+        for( j = 0; j < getNumCols(); j++ ){
+
+            if( types[i][j] == SBMT_ZERO ){
+
+                types    [i][j] = arg.types    [i][j];
+                elements [i][j] =-arg.elements [i][j];
+            }
+            else{
+                if( arg.types[i][j] != SBMT_ZERO ){
+
+                   types    [i][j]  = SBMT_DENSE         ;
+                   elements [i][j] -= arg.elements [i][j];
+                }
+            }
+        }
+    }
+	return *this;
+}
+
+void BlockMatrix::mat_mat_sub(const BlockMatrix& m1, const BlockMatrix& arg, BlockMatrix& tmp)
+{
+    ASSERT( ( m1.getNumRows( ) == arg.getNumRows( ) ) && ( m1.getNumCols( ) == arg.getNumCols( ) ) );
+
+    uint i,j;
+
+    tmp.init( m1.getNumRows(), m1.getNumCols() );
+
+    for( i=0; i < m1.getNumRows(); i++ ){
+        for( j=0; j < m1.getNumCols(); j++ ){
+
+            if( arg.types[i][j] == SBMT_ZERO ){
+
+                tmp.types    [i][j] = m1.types    [i][j];
+                tmp.elements [i][j] = m1.elements [i][j];
+            }
+            else{
+                if( m1.types[i][j] != SBMT_ZERO ){
+
+                   tmp.types    [i][j]  = SBMT_DENSE;
+                   tmp.elements [i][j]  = m1.elements [i][j] - arg.elements[i][j];
+                }
+                else{
+
+                   DMatrix nn(arg.elements[i][j].getNumRows(),arg.elements[i][j].getNumCols());
+                   nn.setZero();
+
+                   tmp.types    [i][j]  = SBMT_DENSE;
+                   tmp.elements [i][j]  = nn - arg.elements[i][j];
+                }
+            }
+        }
+    }
+  
+}
 
 BlockMatrix BlockMatrix::operator-( const BlockMatrix& arg ) const{
 
@@ -268,6 +407,83 @@ BlockMatrix BlockMatrix::operator*( const BlockMatrix& arg ) const{
     return result;
 }
 
+void BlockMatrix::mat_mat_mul(const BlockMatrix& m1, const BlockMatrix& arg, BlockMatrix& result)
+{
+    ASSERT( m1.getNumCols( ) == arg.getNumRows( ) );
+
+    uint i,j,k;
+
+    uint newNumRows = m1.getNumRows( );
+    uint newNumCols = arg.getNumCols( );
+    //BlockMatrix result( newNumRows,newNumCols );
+    result.init( newNumRows,newNumCols );
+
+    for( i=0; i<newNumRows; ++i ){
+        for( k=0; k<m1.getNumCols( ); ++k ){
+
+            switch( m1.types[i][k] ){
+
+                case SBMT_DENSE:
+
+                    for( j=0; j<newNumCols; ++j ){
+
+                        if( arg.types[k][j] == SBMT_DENSE ){
+
+                            if( result.types[i][j] != SBMT_ZERO )
+                                  result.elements[i][j] += m1.elements[i][k] * arg.elements[k][j];
+                            else  result.elements[i][j]  = m1.elements[i][k] * arg.elements[k][j];
+                        }
+
+                        if( arg.types[k][j] == SBMT_ONE ){
+
+                            if( result.types[i][j] != SBMT_ZERO )
+                                  result.elements[i][j] += m1.elements[i][k];
+                            else  result.elements[i][j]  = m1.elements[i][k];
+                        }
+
+                        if( arg.types[k][j] != SBMT_ZERO )
+                            result.types[i][j]  = SBMT_DENSE;
+                    }
+                    break;
+
+
+                case SBMT_ONE:
+
+                    for( j=0; j<newNumCols; ++j ){
+
+                         if( arg.types[k][j] == SBMT_DENSE ){
+
+                             if( result.types[i][j] != SBMT_ZERO )
+                                   result.elements[i][j] += arg.elements[k][j];
+                             else  result.elements[i][j]  = arg.elements[k][j];
+
+                             result.types[i][j]  = SBMT_DENSE;
+                         }
+
+                         if( arg.types[k][j] == SBMT_ONE ){
+
+                             if( result.types[i][j] == SBMT_ZERO ){
+                                   result.elements[i][j]  = m1.elements[i][k];
+                                   result.types   [i][j]  = SBMT_ONE      ;
+                             }
+                             else{
+                                   result.elements[i][j] += m1.elements[i][k];
+                                   result.types   [i][j]  = SBMT_DENSE    ;
+                             }
+                         }
+                     }
+                     break;
+
+                case SBMT_ZERO:
+
+                     break;
+
+                default:
+                     break;
+            }
+        }
+    }
+}
 
 BlockMatrix BlockMatrix::operator^( const BlockMatrix& arg ) const{
 
@@ -342,6 +558,81 @@ BlockMatrix BlockMatrix::operator^( const BlockMatrix& arg ) const{
 	return result;
 }
 
+void BlockMatrix::matT_mat_mul(const BlockMatrix& m1, const BlockMatrix& arg, BlockMatrix& result)
+{
+	ASSERT( m1.getNumRows( ) == arg.getNumRows( ) );
+
+	uint i,j,k;
+
+	uint newNumRows = m1.getNumCols( );
+	uint newNumCols = arg.getNumCols( );
+	
+	result.init(newNumRows, newNumCols);
+	
+    for( i=0; i<newNumRows; ++i ){
+        for( k=0; k<m1.getNumRows( ); ++k ){
+
+            switch( m1.types[k][i] ){
+
+                case SBMT_DENSE:
+				{
+					const DMatrix m1_elements_k_i_transpose  = m1.elements[k][i].transpose();
+                    for( j=0; j<newNumCols; ++j ){
+
+                        if( arg.types[k][j] == SBMT_DENSE ){
+                            if( result.types[i][j] != SBMT_ZERO )
+                                  result.elements[i][j] += m1_elements_k_i_transpose * arg.elements[k][j];
+                            else  result.elements[i][j]  = m1_elements_k_i_transpose * arg.elements[k][j];
+                        }
+
+                        if( arg.types[k][j] == SBMT_ONE ){
+                            if( result.types[i][j] != SBMT_ZERO )
+                                  result.elements[i][j] += m1_elements_k_i_transpose;
+                            else  result.elements[i][j]  = m1_elements_k_i_transpose;
+                        }
+
+                        if( arg.types[k][j] != SBMT_ZERO )
+                             result.types[i][j]  = SBMT_DENSE;
+                    }
+                    break;
+				}
+
+                case SBMT_ONE:
+
+                    for( j=0; j<newNumCols; ++j ){
+
+                        if( arg.types[k][j] == SBMT_DENSE ){
+                            if( result.types[i][j] != SBMT_ZERO )
+                                  result.elements[i][j] += arg.elements[k][j];
+                            else  result.elements[i][j]  = arg.elements[k][j];
+                            result.types[i][j]  = SBMT_DENSE;
+                        }
+
+                        if( arg.types[k][j] == SBMT_ONE ){
+
+                            if( result.types[i][j] == SBMT_ZERO ){
+                                  result.elements[i][j]  = m1.elements[k][i];
+                                  result.types   [i][j]  = SBMT_ONE      ;
+                            }
+                            else{
+                                  result.elements[i][j] += m1.elements[k][i];
+                                  result.types   [i][j]  = SBMT_DENSE    ;
+                            }
+                        }
+                    }
+                    break;
+
+                case SBMT_ZERO:
+                     break;
+
+                default:
+                     break;
+            }
+        }
+    }
+}
+
+
 
 BlockMatrix BlockMatrix::transpose() const{
 
@@ -358,6 +649,21 @@ BlockMatrix BlockMatrix::transpose() const{
 
      return result;
 }
+
+void BlockMatrix::transpose(BlockMatrix& result) const
+{
+     result.init( getNumCols(), getNumRows() );
+
+     uint i,j;
+
+     for( i = 0; i < getNumRows(); i++ ){
+         for( j = 0; j < getNumCols(); j++ ){
+             result.elements[j][i] = elements[i][j].transpose();
+             result.types   [j][i] = types   [i][j]            ;
+         }
+     }
+}
+
 
 
 BlockMatrix BlockMatrix::getAbsolute() const{
@@ -379,6 +685,24 @@ BlockMatrix BlockMatrix::getAbsolute() const{
     return result;
 }
 
+void BlockMatrix::getAbsolute(BlockMatrix& result) const
+{
+	uint run1, run2;
+    result.init( nRows, nCols );
+
+    for( run1 = 0; run1 < nRows; run1++ ){
+        for( run2 = 0; run2 < nCols; run2++ ){
+
+            if( types[run1][run2] == SBMT_ONE )
+                result.setIdentity( run1, run2, elements[run1][run2].getNumRows() );
+
+            if( types[run1][run2] == SBMT_DENSE )
+                result.setDense( run1, run2, elements[run1][run2].absolute() );
+        }
+    }  
+}
+
+		
 
 BlockMatrix BlockMatrix::getPositive() const{
 
@@ -399,6 +723,22 @@ BlockMatrix BlockMatrix::getPositive() const{
     return result;
 }
 
+void BlockMatrix::getPositive(BlockMatrix& result) const
+{
+	uint run1, run2;
+    result.init( nRows, nCols );
+
+    for( run1 = 0; run1 < nRows; run1++ ){
+        for( run2 = 0; run2 < nCols; run2++ ){
+
+            if( types[run1][run2] == SBMT_ONE )
+                result.setIdentity( run1, run2, elements[run1][run2].getNumRows() );
+
+            if( types[run1][run2] == SBMT_DENSE )
+                result.setDense( run1, run2, elements[run1][run2].positive() );
+        }
+    } 
+}
 
 BlockMatrix BlockMatrix::getNegative() const{
 
@@ -416,6 +756,19 @@ BlockMatrix BlockMatrix::getNegative() const{
     return result;
 }
 
+void BlockMatrix::getNegative(BlockMatrix& result) const
+{
+	uint run1, run2;
+    result.init( nRows, nCols );
+
+    for( run1 = 0; run1 < nRows; run1++ ){
+        for( run2 = 0; run2 < nCols; run2++ ){
+
+            if( types[run1][run2] == SBMT_DENSE )
+                result.setDense( run1, run2, elements[run1][run2].negative() );
+        }
+    }
+}
 
 returnValue BlockMatrix::print( std::ostream& stream) const
 {

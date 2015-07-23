@@ -534,8 +534,8 @@ returnValue CondensingBasedCPsolver::condense(	BandedCP& cp
 		if ( condensingStatus != COS_FROZEN )
 		{
 			// generate H
-			hT       = cp.hessian*T;
-			HDense   = T^hT;
+			BlockMatrix::mat_mat_mul(cp.hessian, T, hT);
+			BlockMatrix::matT_mat_mul(T, hT, HDense);
 
 			if( getNX() != 0 ) generateHessianBlockLine( getNX(), rowOffset, rowOffset1 );
 			rowOffset++;
@@ -560,7 +560,7 @@ returnValue CondensingBasedCPsolver::condense(	BandedCP& cp
 
 
 			// generate A
-			ADense   = cp.constraintGradient*T;
+			BlockMatrix::mat_mat_mul(cp.constraintGradient, T, ADense);
 
 			denseCP.A.setZero();
 
@@ -578,7 +578,9 @@ returnValue CondensingBasedCPsolver::condense(	BandedCP& cp
 
 
 		// generate g
-		gDense   = (cp.objectiveGradient*T) + (d^hT);
+		BlockMatrix::mat_mat_mul(cp.objectiveGradient, T, temporary1);
+		BlockMatrix::matT_mat_mul(d, hT, temporary2);
+		BlockMatrix::mat_mat_add(temporary1, temporary2, gDense);
 		
         generateObjectiveGradient( );
 
@@ -592,15 +594,16 @@ returnValue CondensingBasedCPsolver::condense(	BandedCP& cp
                 dCut.setDense(run1,0,tmp);
         }
 
-        lbDense  = cp.lowerBoundResiduum - dCut;
-        ubDense  = cp.upperBoundResiduum - dCut;
+        BlockMatrix::mat_mat_sub(cp.lowerBoundResiduum, dCut, lbDense);
+        BlockMatrix::mat_mat_sub(cp.upperBoundResiduum, dCut, ubDense);
 
         generateBoundVectors( );
 
 
 		// generate lbA, ubA
-		lbADense = cp.lowerConstraintResiduum - cp.constraintGradient*d;
-		ubADense = cp.upperConstraintResiduum - cp.constraintGradient*d;
+		BlockMatrix::mat_mat_mul(cp.constraintGradient, d, temporary3);
+		BlockMatrix::mat_mat_sub(cp.lowerConstraintResiduum, temporary3, lbADense);
+		BlockMatrix::mat_mat_sub(cp.upperConstraintResiduum, temporary3, ubADense);
 
         rowOffset1 = 0;
         for( run3 = 0; run3 < ADense.getNumRows(); run3++ ){
@@ -1157,12 +1160,14 @@ returnValue CondensingBasedCPsolver::expand(	BandedCP& cp
             rowCount++;
         }
 
-        cp.deltaX = T*primalDense + d;
-
+		BlockMatrix::mat_mat_mul(T, primalDense, cp.deltaX);
+		cp.deltaX += d;
+		
         BlockMatrix aux;
 
-        aux = (cp.deltaX^cp.hessian) + cp.objectiveGradient;
-
+		BlockMatrix::matT_mat_mul(cp.deltaX, cp.hessian, aux);
+		aux += cp.objectiveGradient;
+		
         DVector aux2(N*getNX());
         aux2.setZero();
 

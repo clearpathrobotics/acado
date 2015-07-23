@@ -114,8 +114,11 @@ returnValue SCPmeritFunction::evaluate(	double alpha,
 //     cp.lambdaDynamic.print();
 
     if( eval.isDynamicNLP( ) == BT_TRUE ){
-
-        (cp.lambdaDynamic.getAbsolute()^cp.dynResiduum.getAbsolute()).getSubBlock( 0, 0, tmp, 1, 1 );
+        //(cp.lambdaDynamic.getAbsolute()^cp.dynResiduum.getAbsolute()).getSubBlock( 0, 0, tmp, 1, 1 );
+		cp.lambdaDynamic.getAbsolute(cp_lambdaDynamic_getAbsolute);
+		cp.dynResiduum.getAbsolute(cp_dynResiduum_getAbsolute);
+		BlockMatrix::matT_mat_mul(cp_lambdaDynamic_getAbsolute, cp_dynResiduum_getAbsolute, temporary0);
+		temporary0.getSubBlock( 0, 0, tmp, 1, 1 );
         result += kappa*tmp(0,0);
     }
 
@@ -131,20 +134,28 @@ returnValue SCPmeritFunction::evaluate(	double alpha,
 //      acadoPrintf("lowerBoundRes = \n");
 //     (cp.lowerBoundResiduum.negative()).print();
 
-
-    (cp.lambdaBound.getAbsolute()^cp.upperBoundResiduum.getNegative()).getSubBlock( 0, 0, tmp, 1, 1 );
+	
+	cp.lambdaBound.getAbsolute(cp_lambdaBound_getAbsolute);
+	cp.upperBoundResiduum.getNegative(cp_upperBoundResiduum_getNegative);
+	BlockMatrix::matT_mat_mul(cp_lambdaBound_getAbsolute, cp_upperBoundResiduum_getNegative, temporary1);
+	temporary1.getSubBlock( 0, 0, tmp, 1, 1 );
     result -= kappa*tmp(0,0);
 
 //     acadoPrintf("result3 = %.16e \n", result );
 
-    (cp.lambdaBound.getAbsolute()^cp.lowerBoundResiduum.getPositive()).getSubBlock( 0, 0, tmp, 1, 1 );
-    result += kappa*tmp(0,0);
+	cp.lowerBoundResiduum.getPositive(cp_lowerBoundResiduum_getPositive);
+	BlockMatrix::matT_mat_mul(cp_lambdaBound_getAbsolute, cp_lowerBoundResiduum_getPositive, temporary2);
+	temporary2.getSubBlock( 0, 0, tmp, 1, 1 );
+	result += kappa*tmp(0,0);
 
 //     acadoPrintf("result4 = %.16e \n", result );
 
     // --------
 
-    (cp.lambdaConstraint.getAbsolute()^cp.upperConstraintResiduum.getNegative()).getSubBlock( 0, 0, tmp, 1, 1 );
+	cp.lambdaConstraint.getAbsolute(cp_lambdaConstraint_getAbsolute);
+	cp.upperConstraintResiduum.getNegative(cp_upperConstraintResiduum_getNegative);
+	BlockMatrix::matT_mat_mul(cp_lambdaConstraint_getAbsolute, cp_upperConstraintResiduum_getNegative, temporary3);
+	temporary3.getSubBlock( 0, 0, tmp, 1, 1 );
     result -= kappa*tmp(0,0);
 
 //      acadoPrintf("result5 = %.16e \n", result );
@@ -155,8 +166,11 @@ returnValue SCPmeritFunction::evaluate(	double alpha,
 //      acadoPrintf("cp.lambdaConstraint = \n");
 //      cp.lowerConstraintResiduum.print();
 
-    (cp.lambdaConstraint.getAbsolute()^cp.lowerConstraintResiduum.getPositive()).getSubBlock( 0, 0, tmp, 1, 1 );
-    result += kappa*tmp(0,0);
+	cp.lowerConstraintResiduum.getPositive(cp_lowerConstraintResiduum_getPositive);
+	BlockMatrix::matT_mat_mul(cp_lambdaConstraint_getAbsolute, cp_lowerConstraintResiduum_getPositive, temporary4);
+	temporary4.getSubBlock( 0, 0, tmp, 1, 1 );
+
+	result += kappa*tmp(0,0);
 
 //     acadoPrintf("result6 = %.16e \n", result );
 
